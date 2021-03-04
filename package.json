@@ -1,0 +1,32 @@
+{
+  "name": "rtcfire",
+  "version": "0.0.1",
+  "description": "A simple WebRTC + Firebase Realtime Database library for multi-user video chat",
+  "source": "src/index.js",
+  "main": "dist/index.js",
+  "exports": "./dist/index.modern.js",
+  "module": "dist/index.module.js",
+  "unpkg": "dist/index.umd.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "microbundle",
+    "dev": "microbundle watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/romannurik/rtcfire.git"
+  },
+  "devDependencies": {
+    "microbundle": "0.13.0"
+  },
+  "keywords": [
+    "webrtc",
+    "firebase"
+  ],
+  "author": "Roman Nurik <roman@nurik.net>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/romannurik/rtcfire/issues"
+  },
+  "homepage": "https://github.com/romannurik/rtcfire#readme"
+}
