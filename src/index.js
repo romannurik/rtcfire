@@ -302,7 +302,6 @@ class RTCFireSession {
   async maybeContinueNegotiation(pid) {
     let info = this.participantInfo[pid];
     let { conn, negotiationState, writeRef, readVal } = info;
-    let { iceDone, cleanup } = readVal;
 
     switch (negotiationState) {
       case NegotiationState.OffererNotStarted: {
@@ -332,6 +331,7 @@ class RTCFireSession {
       }
 
       case NegotiationState.WaitingToFinishIceCandidates: {
+        let { iceDone } = readVal;
         if (iceDone) {
           info.negotiationState = NegotiationState.Cleanup;
         }
@@ -339,9 +339,10 @@ class RTCFireSession {
       }
 
       case NegotiationState.Cleanup: {
+        let { cleanup } = readVal;
         // we're ready for cleanup on our end, indicate as such
         writeRef.update({ cleanup: true });
-        if (cleanup) {
+        if (cleanup || Object.keys(readVal).length === 0) {
           // once remote is also ready for cleanup, move to complete state
           info.negotiationState = NegotiationState.Complete;
         }
