@@ -11,6 +11,8 @@ import { rtcFireSession } from 'rtcfire';
 
 let session = rtcFireSession({
   // list of user IDs, including your own!
+  // when the set of participants changes, call:
+  //   session.participants = [user.uid, 'uid1'];
   participants: [user.uid, 'uid1', 'uid2', ...],
   // the current user's uid, probably from Firebase Auth
   myId: user.uid,
