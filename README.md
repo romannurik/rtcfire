@@ -4,6 +4,17 @@ A simple WebRTC + Firebase Realtime Database JS library for multi-user video cha
 
 **WARNING: This library is experimental, and not battle-tested. Bug reports and PRs welcome.**
 
+# Installation
+
+Install with npm:
+
+    npm install rtcfire
+
+# Dependencies
+
+The only dependency is the [Firebase JS SDK](https://firebase.google.com/docs/reference/js)
+(`npm install firebase`), which is a peer dependency and not directly `require`d by this library.
+
 # Usage
 
 ```js
