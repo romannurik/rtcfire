@@ -4,6 +4,8 @@ A simple WebRTC + Firebase Realtime Database JS library for multi-user video cha
 
 **WARNING: This library is experimental, and not battle-tested. Bug reports and PRs welcome.**
 
+[See the demo](https://rtcfiredemo.web.app)
+
 # Installation
 
 Install with npm:
@@ -40,7 +42,7 @@ let session = rtcFireSession({
 
 # Security rules
 
-Don't forget to write appropriate security rules for your Realtime Database! See [example_rtdb_rules.rules] for an example that uses the default `negotiationRef` paths.
+Don't forget to write appropriate security rules for your Realtime Database! See [example_rtdb_rules.rules](example_rtdb_rules.rules) for an example that uses the default `negotiationRef` paths.
 
 # License
 
