@@ -1,0 +1,30 @@
+{
+  "rules": {
+    ".read": "false",
+    ".write": "false",
+    // just an example of scoping a call to a topic id
+    "$topic": {
+      // this is the negotiationRef you pass to rtcfire
+      // the default paths write to negotiationRef/<your uid>/<their uid>
+      // and read from negotiationRef/<their uid>/<your uid>
+      "negotiations": {
+        "$writerUid": {
+          ".read": "auth.uid == $writerUid",
+          ".write": "auth.uid == $writerUid",
+          "$readerUid": {
+            ".read": "auth.uid == $readerUid"
+          }
+        }
+      }
+      // typically you'll store the list of people who have "joined" the call
+      // in a separate place, as "negotations" is entirely transient, for WebRTC
+      // signalling
+      "participants": {
+        ".read": "auth.uid != null",
+        "$uid": {
+          ".write": "auth.uid == $uid"
+        }
+      },
+    }
+  }
+}

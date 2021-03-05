@@ -38,6 +38,10 @@ let session = rtcFireSession({
 });
 ```
 
+# Security rules
+
+Don't forget to write appropriate security rules for your Realtime Database! See [example_rtdb_rules.rules] for an example that uses the default `negotiationRef` paths.
+
 # License
 
 Apache 2.0 (see [LICENSE](LICENSE))

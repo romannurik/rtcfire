@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>rtcfire demo</title>
+</head>
+
+<body>
+
+  <h3>Your local video stream:</h3>
+  <video id="my-video" muted autoplay style="width: 300px; height: 200px; transform: scaleX(-1);"></video>
+
+  <h3>Other people:</h3>
+  <ul id="peers"></ul>
+
+  <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-database.js"></script>
+  <script src="https://unpkg.com/rtcfire/dist/index.umd.js"></script>
+
+  <script>
+
+    class Demo {
+      constructor() {
+        this.setupFirebase();
+        this.signIn();
+      }
+
+      setupFirebase() {
+        firebase.initializeApp({
+          apiKey: "AIzaSyCo0ZFzjX2yzdYvuf_L-aMODCApcIG_zi0",
+          authDomain: "rtcfiredemo.firebaseapp.com",
+          projectId: "rtcfiredemo",
+          storageBucket: "rtcfiredemo.appspot.com",
+          appId: "1:399305772248:web:5f53bf2d781faa3c111bad",
+        });
+      }
+
+      signIn() {
+        firebase.auth().onAuthStateChanged(user => {
+          this.user = user;
+          if (user) {
+            this.setupVideo();
+          } else {
+            // TODO: teardown session!
+            firebase.auth().signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+          }
+        });
+      }
+
+      setupVideo() {
+        let { uid } = this.user;
+        let topicId = 'my-chat-room';
+        let participantsRef = firebase.database().ref(`${topicId}/participants`);
+        let videoStreams = {};
+        this.meRef = participantsRef.child(uid);
+        this.meRef.update({ joined: true });
+
+        this.rtcSession = rtcfire.rtcFireSession({
+          myId: uid,
+          negotiationRef: firebase.database().ref(`${topicId}/negotiations`),
+          onMyStream: stream => document.querySelector('#my-video').srcObject = stream,
+          onParticipantStream: (pid, stream) => {
+            videoStreams[pid] = stream;
+            this.updatePeers(this.rtcSession.participants, videoStreams);
+          },
+        });
+
+        this.meRef.onDisconnect().set(null);
+
+        participantsRef.on('value', snap => {
+          let participants = Object.keys(snap.val() || {});
+          this.rtcSession.participants = participants;
+          this.updatePeers(participants, videoStreams);
+        });
+      }
+
+      updatePeers(participants, videoStreams) {
+        participants = new Set(participants.filter(pid => pid !== this.user.uid));
+        let parent = document.querySelector('#peers');
+
+        // new and existing peers
+        for (let pid of participants) {
+          let node = parent.querySelector(`li[data-pid="${pid}"]`);
+          if (!node) {
+            node = document.createElement('li');
+            node.setAttribute('data-pid', pid);
+            node.innerHTML = '<video muted autoplay style="width: 300px; height: 200px">';
+            parent.appendChild(node);
+          }
+
+          let video = node.querySelector('video');
+          video.srcObject = videoStreams[pid];
+        }
+
+        // removed peers
+        for (let existing of parent.querySelectorAll('li')) {
+          if (!participants.has(existing.getAttribute('data-pid'))) {
+            parent.removeChild(existing);
+          }
+        }
+      }
+    }
+
+    new Demo();
+
+  </script>
+
+</body>
+
+</html>
