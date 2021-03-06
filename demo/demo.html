@@ -19,11 +19,17 @@
   <script src="https://unpkg.com/rtcfire/dist/index.umd.js"></script>
 
   <script>
+    const TAB_ID = Math.floor(Math.random() * 9999);
 
     class Demo {
       constructor() {
-        this.setupFirebase();
-        this.signIn();
+        this.topic = (window.location.search.match(/topic=(.+)/) || [])[1];
+        if (this.topic) {
+          this.setupFirebase();
+          this.signIn();
+        } else {
+          window.location.search = 'topic=' + Math.floor(Math.random() * 9999);
+        }
       }
 
       setupFirebase() {
@@ -40,6 +46,7 @@
         firebase.auth().onAuthStateChanged(user => {
           this.user = user;
           if (user) {
+            this.myId = `${this.user.uid}:${TAB_ID}`;
             this.setupVideo();
           } else {
             // TODO: teardown session!
@@ -49,16 +56,14 @@
       }
 
       setupVideo() {
-        let { uid } = this.user;
-        let topicId = 'my-chat-room';
-        let participantsRef = firebase.database().ref(`${topicId}/participants`);
+        let participantsRef = firebase.database().ref(`${this.topic}/participants`);
         let videoStreams = {};
-        this.meRef = participantsRef.child(uid);
+        this.meRef = participantsRef.child(this.myId);
         this.meRef.update({ joined: true });
 
         this.rtcSession = rtcfire.rtcFireSession({
-          myId: uid,
-          negotiationRef: firebase.database().ref(`${topicId}/negotiations`),
+          myId: this.myId,
+          negotiationRef: firebase.database().ref(`${this.topic}/negotiations`),
           onMyStream: stream => document.querySelector('#my-video').srcObject = stream,
           onParticipantStream: (pid, stream) => {
             videoStreams[pid] = stream;
@@ -76,7 +81,7 @@
       }
 
       updatePeers(participants, videoStreams) {
-        participants = new Set(participants.filter(pid => pid !== this.user.uid));
+        participants = new Set(participants.filter(pid => pid !== this.myId));
         let parent = document.querySelector('#peers');
 
         // new and existing peers
