@@ -56,18 +56,16 @@ class RTCFireSession {
     this.options = options;
     this.options.isOfferer = this.options.isOfferer
       || (pid => this.options.myId.localeCompare(pid) < 0);
+    this.participants = this.options.participants || [];
 
     (async () => {
       try {
         this.localStream = await navigator.mediaDevices.getUserMedia(
           options.mediaConstraints || DEFAULT_MEDIA_CONSTRAINTS);
+        this.hasLocalStreams = true;
+        this.maybeProcessParticipantChanges();
 
         this.muted = !!this.options.muted;
-
-        // set local stream for all existing connections
-        for (let { conn } of Object.values(this.participantInfo).filter(({ conn }) => !!conn)) {
-          this.addLocalStreamToConnection(conn);
-        }
       } catch (error) {
         console.error('Error getting local video stream', error);
       }
@@ -96,14 +94,27 @@ class RTCFireSession {
    */
   get participants() {
     // TODO: cache?
-    return Object.keys(this.participantInfo);
+    return this._participants;
   }
 
   /**
    * Sets the new list of participant IDs to connect with
    */
   set participants(participants) {
-    let set = new Set(participants);
+    this._participants = [...participants];
+    this.maybeProcessParticipantChanges();
+  }
+
+  /**
+   * Sets up connections for new participants, and
+   * tears down connections for removed ones.
+   */
+  maybeProcessParticipantChanges() {
+    if (!this.hasLocalStreams) {
+      return;
+    }
+
+    let set = new Set(this._participants);
     for (let pid of set) {
       if (!(pid in this.participantInfo) && pid !== this.options.myId) {
         this.onAddParticipant(pid);
@@ -117,10 +128,16 @@ class RTCFireSession {
     }
   }
 
+  /**
+   * Is the local side muted?
+   */
   get muted() {
     return !!this._muted;
   }
 
+  /**
+   * Set the local muted state.
+   */
   set muted(muted) {
     this._muted = muted;
     if (this.localStream) {
@@ -196,7 +213,6 @@ class RTCFireSession {
     info.processedIceCandidates = new Set();
 
     info.conn = new RTCPeerConnection(this.options.rtcConfig || DEFAULT_RTC_CONFIG);
-    this.addLocalStreamToConnection(info.conn);
 
     info.conn.onicecandidate = ev => {
       let c = ev.candidate;
@@ -235,6 +251,7 @@ class RTCFireSession {
     }
 
     if (offerer) {
+      this.addLocalStreamToConnection(info.conn); // triggers negotiation
       info.conn.onnegotiationneeded = () => this.beginNegotiation(pid);
     }
   }
@@ -314,6 +331,7 @@ class RTCFireSession {
         if (offer) {
           info.negotiationState = NegotiationState.WaitingToFinishIceCandidates;
           conn.setRemoteDescription(new RTCSessionDescription(offer));
+          this.addLocalStreamToConnection(info.conn);
           let sessionDescription = await conn.createAnswer();
           conn.setLocalDescription(sessionDescription);
           await writeRef.update({ answer: sessionDescription });
