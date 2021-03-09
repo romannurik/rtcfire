@@ -3,15 +3,60 @@
 
 <head>
   <title>rtcfire demo</title>
+  <meta name="viewport" content="width=device-width, minimimum-scale=1">
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+
+    #topic-header code {
+      font-size: 16px;
+      color: coral;
+    }
+
+    #peers-header,
+    #zero-state {
+      display: none;
+    }
+
+    #peers {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-flow: row wrap;
+    }
+
+    video {
+      background-color: #eee;
+      object-fit: cover;
+      width: 300px;
+      aspect-ratio: 4 / 3;
+      max-width: 100%;
+    }
+
+    #peers video {
+      margin: 0 8px 8px 0;
+    }
+
+    #my-video {
+      transform: scaleX(-1);
+    }
+  </style>
 </head>
 
 <body>
 
-  <h3>Your local video stream:</h3>
-  <video id="my-video" muted autoplay style="width: 300px; height: 200px; transform: scaleX(-1);"></video>
+  <h1><a href="https://github.com/romannurik/rtcfire">rtcfire</a> demo</h1>
+  <p id="topic-header"></p>
+  <h3>Your local video stream</h3>
+  <video id="my-video" muted autoplay></video>
 
-  <h3>Other people:</h3>
+  <h3 id="peers-header">Other participants</h3>
   <ul id="peers"></ul>
+  <div id="zero-state">
+    Share this page's URL with a friend, or open it in another tab!
+  </div>
 
   <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-auth.js"></script>
@@ -19,16 +64,28 @@
   <script src="https://unpkg.com/rtcfire/dist/index.umd.js"></script>
 
   <script>
-    const TAB_ID = Math.floor(Math.random() * 9999);
+    const FRUIT = [
+      'apple', 'apricot', 'avocado', 'banana', 'cacao', 'cashew', 'cherry', 'coconut', 'currant', 'date',
+      'fig', 'grape', 'guava', 'kiwi', 'kumquat', 'lemon', 'lime', 'lychee', 'melon', 'nutmeg', 'orange',
+      'papaya', 'peach', 'pear', 'plum', 'pumpkin', 'tomato'
+    ];
+
+    const randomTopic = () => Array(3)
+      .fill()
+      .map(() => FRUIT[Math.floor(Math.random() * FRUIT.length)])
+      .join('-');
+
+    const TAB_ID = String(Math.floor(Math.random() * 9999));
 
     class Demo {
       constructor() {
         this.topic = (window.location.search.match(/topic=(.+)/) || [])[1];
         if (this.topic) {
+          document.querySelector('#topic-header').innerHTML += `Room/topic: <code><b>${this.topic}</b></code>`;
           this.setupFirebase();
           this.signIn();
         } else {
-          window.location.search = 'topic=' + Math.floor(Math.random() * 9999);
+          window.location.search = `topic=${randomTopic()}`;
         }
       }
 
@@ -50,7 +107,7 @@
             this.setupVideo();
           } else {
             // TODO: teardown session!
-            firebase.auth().signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+            firebase.auth().signInAnonymously();
           }
         });
       }
@@ -83,6 +140,7 @@
 
       updatePeers(participants, videoStreams) {
         participants = new Set(participants.filter(pid => pid !== this.myId));
+
         let parent = document.querySelector('#peers');
 
         // new and existing peers
@@ -91,7 +149,7 @@
           if (!node) {
             node = document.createElement('li');
             node.setAttribute('data-pid', pid);
-            node.innerHTML = '<video muted autoplay style="width: 300px; height: 200px">';
+            node.innerHTML = '<video muted autoplay>';
             parent.appendChild(node);
           }
 
@@ -105,6 +163,11 @@
             parent.removeChild(existing);
           }
         }
+
+        // zero state
+        let zero = participants.size === 0;
+        document.querySelector('#peers-header').style.display = zero ? 'none' : 'block';
+        document.querySelector('#zero-state').style.display = zero ? 'block' : 'none';
       }
     }
 
