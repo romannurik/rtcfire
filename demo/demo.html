@@ -124,7 +124,6 @@
           onMyStream: stream => document.querySelector('#my-video').srcObject = stream,
           onParticipantStream: (pid, stream) => {
             videoStreams[pid] = stream;
-            console.log(stream);
             this.updatePeers(this.rtcSession.participants, videoStreams);
           },
         });
