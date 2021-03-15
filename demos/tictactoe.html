@@ -1,0 +1,266 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>rtcfire Tic Tac Toe demo</title>
+  <meta name="viewport" content="width=device-width, minimum-scale=1">
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      text-align: center;
+    }
+
+    #my-video {
+      transform: scaleX(-1);
+    }
+
+    #videos {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 32px;
+    }
+
+    #my-video,
+    #opponent-video {
+      width: 128px;
+      height: 128px;
+      border-radius: 50%;
+      object-fit: cover;
+      background-color: #eee;
+    }
+
+    #game-board {
+      flex: 1 1 0;
+      display: grid;
+      grid-template: 1fr 1fr 1fr / 1fr 1fr 1fr;
+      margin: 32px 0;
+    }
+
+    #game-board button {
+      font-size: 32px;
+    }
+
+    #game-status {
+      margin-top: 8px;
+      height: 40px;
+      font-size: 24px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #game-status button {
+      margin: 12px;
+      font-size: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1><a href="https://github.com/romannurik/rtcfire">rtcfire</a> Tic Tac Toe</h1>
+  <div id="videos">
+    <video id="my-video" muted autoplay></video>
+    <video id="opponent-video" autoplay></video>
+  </div>
+  <div id="game-board"></div>
+  <div id="game-status"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-database.js"></script>
+  <script src="https://unpkg.com/rtcfire/dist/index.umd.js"></script>
+
+  <script>
+    const randomGameId = () => String(Math.floor(Math.random() * 9999));
+
+    const TAB_ID = String(Math.floor(Math.random() * 9999));
+
+    class Demo {
+      constructor() {
+        this.gameId = (window.location.search.match(/gameId=(.+)/) || [])[1];
+        if (this.gameId) {
+          this.setupFirebase();
+          this.signIn();
+        } else {
+          window.location.search = `gameId=${randomGameId()}`;
+        }
+      }
+
+      setupFirebase() {
+        firebase.initializeApp({
+          apiKey: "AIzaSyCo0ZFzjX2yzdYvuf_L-aMODCApcIG_zi0",
+          authDomain: "rtcfiredemo.firebaseapp.com",
+          projectId: "rtcfiredemo",
+          storageBucket: "rtcfiredemo.appspot.com",
+          appId: "1:399305772248:web:5f53bf2d781faa3c111bad",
+        });
+      }
+
+      signIn() {
+        firebase.auth().onAuthStateChanged(user => {
+          this.user = user;
+          if (user) {
+            this.myId = `${this.user.uid}:${TAB_ID}`;
+            this.setupGame();
+            this.rerenderGame();
+          } else {
+            // TODO: teardown session!
+            firebase.auth().signInAnonymously();
+          }
+        });
+      }
+
+      setupGame() {
+        this.gameStateRef = firebase.database().ref(`tictactoe/${this.gameId}/gameState`);
+        this.participantsRef = firebase.database().ref(`tictactoe/${this.gameId}/participants`);
+
+        this.gameStateRef.on('value', snap => {
+          if (this.cantJoin) {
+            return;
+          }
+
+          this.gameState = snap.val() || {};
+          this.rerenderGame();
+        });
+
+        this.participantsRef.on('value', snap => {
+          let participants = Object.keys(snap.val() || {});
+          let alreadyParticipating = participants.indexOf(this.myId) >= 0;
+          if (participants.length >= 2 && !alreadyParticipating) {
+            // already 2 participants and i'm not one of them
+            this.cantJoin = true;
+            this.rerenderGame();
+            return;
+          }
+
+          // i am/should be a player in the game
+          this.opponentId = participants.filter(id => id !== this.myId)[0] || null;
+          if (!alreadyParticipating) {
+            this.initGameAndVideo(this.opponentId ? 'O' : 'X');
+          } else if (!this.opponentId) {
+            this.myPiece = 'X';
+            let meRef = this.participantsRef.child(this.myId);
+            meRef.update({ piece: this.myPiece });
+            meRef.onDisconnect().set(null);
+          }
+
+          this.joined = true;
+          this.rtcSession && (this.rtcSession.participants = participants);
+          this.rerenderGame();
+        });
+      }
+
+      initGameAndVideo(piece) {
+        this.myPiece = piece;
+        let meRef = this.participantsRef.child(this.myId);
+        meRef.update({ piece });
+        meRef.onDisconnect().set(null);
+        this.gameStateRef.onDisconnect().set(null);
+        if (this.rtcSession) {
+          this.rtcSession.close();
+        }
+
+        this.rtcSession = rtcfire.rtcFireSession({
+          myId: this.myId,
+          negotiationRef: firebase.database().ref(`tictactoe/${this.gameId}/negotiations`),
+          onMyStream: stream => document.querySelector('#my-video').srcObject = stream,
+          onParticipantStream: (pid, stream) => document.querySelector('#opponent-video').srcObject = stream,
+        });
+      }
+
+      rerenderGame() {
+        let gs = document.querySelector('#game-status');
+        let gb = document.querySelector('#game-board');
+        gs.innerHTML = '';
+        gb.innerHTML = '';
+        if (this.cantJoin) {
+          gs.innerText = `Game already has 2 players`;
+          return;
+        } else if (!this.opponentId) {
+          gs.innerText = `Share this page's URL with a friend, or open it in another tab!`;
+          return;
+        }
+
+        // joined the game... playing
+        let { board = '         ' } = this.gameState;
+        let turn = ((board.match(/X|O/g) || []).length % 2 == 0) ? 'X' : 'O';
+        let winner = this.findWinner(board);
+        if (board.indexOf(' ') < 0 && !winner) {
+          winner = 'tie';
+        }
+        let myTurn = (this.myPiece === turn);
+
+        for (let x = 0; x < 3; x++) {
+          for (let y = 0; y < 3; y++) {
+            let val = board.charAt(y * 3 + x) || ' ';
+            let b = document.createElement('button');
+            b.innerText = val;
+            if (val === 'X' || val === 'O' || !myTurn || winner) {
+              b.disabled = true;
+            } else {
+              b.onclick = () => {
+                let a = board.split('');
+                a[y * 3 + x] = this.myPiece;
+                board = a.join('');
+                this.gameStateRef.update({ board });
+              };
+            }
+            gb.appendChild(b);
+          }
+        }
+
+        if (winner) {
+          gs.innerText = (winner === 'tie')
+            ? `It's a tie!`
+            : `${winner} wins!`;
+          let newButton = document.createElement('button');
+          newButton.textContent = 'New game';
+          newButton.onclick = () => this.gameStateRef.update({ board: null });
+          gs.appendChild(newButton);
+        } else {
+          gs.innerText = myTurn ? `It's your turn` : `It's the other player's turn`;
+        }
+      }
+
+      findWinner(board) {
+        let get = (x, y) => board.charAt(y * 3 + x) || ' ';
+        let rowWinner = (...vals) => vals.reduce((w, v) => (w === v || !w) ? v : ' ', '').replace(/\s+/, '') || null;
+
+        let rowWinners = [
+          rowWinner(get(0, 0), get(1, 0), get(2, 0)), // horizontal
+          rowWinner(get(0, 1), get(1, 1), get(2, 1)), // horizontal
+          rowWinner(get(0, 2), get(1, 2), get(2, 2)), // horizontal
+          rowWinner(get(0, 0), get(0, 1), get(0, 2)), // vertical
+          rowWinner(get(1, 0), get(1, 1), get(1, 2)), // vertical
+          rowWinner(get(2, 0), get(2, 1), get(2, 2)), // vertical
+          rowWinner(get(0, 0), get(1, 1), get(2, 2)), // diagonal
+          rowWinner(get(2, 0), get(1, 1), get(0, 2)), // diagonal
+        ];
+
+        return rowWinners.filter(w => !!w)[0] || null;
+      }
+    }
+
+    window.demo = new Demo();
+
+  </script>
+
+</body>
+
+</html>

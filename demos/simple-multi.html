@@ -2,8 +2,8 @@
 <html>
 
 <head>
-  <title>rtcfire demo</title>
-  <meta name="viewport" content="width=device-width, minimimum-scale=1">
+  <title>rtcfire Simple Multi-peer Demo</title>
+  <meta name="viewport" content="width=device-width, minimum-scale=1">
   <style>
     body {
       font-family: sans-serif;
@@ -47,7 +47,7 @@
 
 <body>
 
-  <h1><a href="https://github.com/romannurik/rtcfire">rtcfire</a> demo</h1>
+  <h1><a href="https://github.com/romannurik/rtcfire">rtcfire</a> Simple Multi-Peer Demo</h1>
   <p id="topic-header"></p>
   <h3>Your local video stream</h3>
   <video id="my-video" muted autoplay></video>
@@ -113,22 +113,22 @@
       }
 
       setupVideo() {
-        let participantsRef = firebase.database().ref(`${this.topic}/participants`);
+        let participantsRef = firebase.database().ref(`topics/${this.topic}/participants`);
         let videoStreams = {};
-        this.meRef = participantsRef.child(this.myId);
-        this.meRef.update({ joined: true });
+
+        let meRef = participantsRef.child(this.myId);
+        meRef.update({ joined: true });
+        meRef.onDisconnect().set(null);
 
         this.rtcSession = rtcfire.rtcFireSession({
           myId: this.myId,
-          negotiationRef: firebase.database().ref(`${this.topic}/negotiations`),
+          negotiationRef: firebase.database().ref(`topics/${this.topic}/negotiations`),
           onMyStream: stream => document.querySelector('#my-video').srcObject = stream,
           onParticipantStream: (pid, stream) => {
             videoStreams[pid] = stream;
             this.updatePeers(this.rtcSession.participants, videoStreams);
           },
         });
-
-        this.meRef.onDisconnect().set(null);
 
         participantsRef.on('value', snap => {
           let participants = Object.keys(snap.val() || {});
@@ -148,7 +148,7 @@
           if (!node) {
             node = document.createElement('li');
             node.setAttribute('data-pid', pid);
-            node.innerHTML = '<video muted autoplay>';
+            node.innerHTML = '<video autoplay>';
             parent.appendChild(node);
           }
 

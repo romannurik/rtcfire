@@ -4,7 +4,7 @@ A simple WebRTC + Firebase Realtime Database JS library for multi-user video cha
 
 **WARNING: This library is experimental, and not battle-tested. Bug reports and PRs welcome.**
 
-[See the demo](https://rtcfiredemo.web.app)
+[See demos](https://rtcfiredemo.web.app)
 
 # Installation
 
