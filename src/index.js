@@ -78,14 +78,14 @@ class RTCFireSession {
    * Shuts down the entire session
    */
   close() {
+    for (let pid in this.participantInfo) {
+      this.onRemoveParticipant(pid);
+    }
+
     if (this.localStream) {
       for (let track of this.localStream.getTracks()) {
         track.stop();
       }
-    }
-
-    for (let pid in this.participantInfo) {
-      this.onRemoveParticipant(pid);
     }
   }
 
@@ -241,8 +241,9 @@ class RTCFireSession {
 
         case 'disconnected':
         case 'failed':
-        case 'close':
+        case 'closed':
           // Tear down and reinit connection
+          this.options.onParticipantStream(pid, null);
           this.teardownConnectionForParticipant(pid);
           this.initConnectionForParticipant(pid);
           this.maybeContinueNegotiation(pid);
