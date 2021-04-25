@@ -87,6 +87,11 @@
         } else {
           window.location.search = `topic=${randomTopic()}`;
         }
+
+        // fix for mobile browser freezes
+        window.addEventListener('beforeunload', () => {
+          this.rtcSession && this.rtcSession.close();
+        });
       }
 
       setupFirebase() {

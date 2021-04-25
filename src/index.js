@@ -70,7 +70,7 @@ class RTCFireSession {
         console.error('Error getting local video stream', error);
       }
 
-      options.onMyStream(this.localStream);
+      this.options.onMyStream(this.localStream);
     })();
   }
 
@@ -85,7 +85,7 @@ class RTCFireSession {
     if (this.localStream) {
       // send null stream to mitigate mobile freezing issues
       // https://github.com/twilio/twilio-video-app-react/issues/355
-      options.onMyStream(null);
+      this.options.onMyStream(null);
       for (let track of this.localStream.getTracks()) {
         track.stop();
       }
