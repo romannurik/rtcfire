@@ -46,13 +46,84 @@ const NegotiationState = {
 };
 
 /**
+ * A Firebase Realtime Database ref per
+ * {@link https://firebase.google.com/docs/reference/js/firebase.database.Reference}
+ */
+type FirebaseDatabaseRef = any;
+
+/**
+ * Options object to initialize an RTCFireSession.
+ */
+export interface RTCFireSessionOptions {
+  /**
+   * An ID representing the current user. Could come from Firebase Auth or elsewhere.
+   */
+  myId: string;
+
+  /**
+   * The root RTDB reference where WebRTC negotiations between peers should be read from/written to.
+   * After negotiation, this ref shouldn't contain any data.
+   */
+  negotiationRef: FirebaseDatabaseRef;
+
+  /**
+   * Callback triggered when the user's local stream is available. Triggered with `null` when the
+   * local stream is closed.
+   */
+  onMyStream: (localStream: MediaStream | null) => void;
+
+  /**
+   * Callback triggered when the given peer's media stream is available. Triggered with `null` when
+   * the stream is close/no longer available.
+   */
+  onParticipantStream: (peerId: string, stream: MediaStream | null) => void;
+
+  /**
+   * Should the current user's local audio stream start muted? Can be changed later using
+   * {@link RTCFireSession#muted}.
+   */
+  muted?: boolean;
+
+  /**
+   * List of initial set of peer IDs for this session. Can be changed later using
+   * {@link RTCFireSession#participants}.
+   */
+  participants?: string[];
+
+  /**
+   * A function that returns true if the current user should be the offerer for a connection with
+   * the given peer, and false if the peer should be the offerer. This should be symmetrical for
+   * both sides of the connection. Defaults to whichever ID (myId or peerId) sorts first
+   * alphabetically.
+   */
+  isOfferer?: (peerId: string) => boolean;
+
+  /**
+   * Optional media stream constraints to pass to `navigator.mediaDevices.getUserMedia`. The default
+   * constraints require audio and video.
+   */
+  mediaConstraints?: MediaStreamConstraints;
+
+  /**
+   * A custom RTC configuration to use. The default
+   * uses Google's public STUN servers.
+   */
+  rtcConfig?: RTCConfiguration;
+}
+
+/**
  * Class to manage an RTC session with multiple participants
  * using Firebase RTDB
  */
 class RTCFireSession {
-  participantInfo = {};
+  private options: RTCFireSessionOptions;
+  private participantInfo = {};
+  private localStream: MediaStream = null;
+  private hasLocalStreams = false;
+  private _muted = false;
+  private _participants: string[] = [];
 
-  constructor(options) {
+  constructor(options: RTCFireSessionOptions) {
     this.options = options;
     this.options.isOfferer = this.options.isOfferer
       || (pid => this.options.myId.localeCompare(pid) < 0);
@@ -93,7 +164,7 @@ class RTCFireSession {
   }
 
   /**
-   * Gets the list of current participant IDs
+   * The list of peer IDs for this session.
    */
   get participants() {
     // TODO: cache?
@@ -101,7 +172,7 @@ class RTCFireSession {
   }
 
   /**
-   * Sets the new list of participant IDs to connect with
+   * Update the list of peer IDs for this session.
    */
   set participants(participants) {
     this._participants = [...participants];
@@ -112,7 +183,7 @@ class RTCFireSession {
    * Sets up connections for new participants, and
    * tears down connections for removed ones.
    */
-  maybeProcessParticipantChanges() {
+  private maybeProcessParticipantChanges() {
     if (!this.hasLocalStreams) {
       return;
     }
@@ -132,14 +203,14 @@ class RTCFireSession {
   }
 
   /**
-   * Is the local side muted?
+   * Get the current user's audio stream muted state.
    */
   get muted() {
     return !!this._muted;
   }
 
   /**
-   * Set the local muted state.
+   * Set the current user's audio stream muted state.
    */
   set muted(muted) {
     this._muted = muted;
@@ -153,7 +224,7 @@ class RTCFireSession {
   /**
    * Handle a participant being added
    */
-  onAddParticipant(pid) {
+  private onAddParticipant(pid) {
     if (pid in this.participantInfo) {
       // already added
       return;
@@ -171,7 +242,15 @@ class RTCFireSession {
       readRef = this.options.negotiationRef.child(`${pid}/${this.options.myId}`);
     }
 
-    let info = { readRef, writeRef, offerer };
+    let info = {
+      readRef,
+      writeRef,
+      offerer,
+      readVal: null,
+      onReadValueChange: null,
+      writeRefOnDisconnect: null,
+    };
+
     this.participantInfo[pid] = info;
     this.initConnectionForParticipant(pid);
 
@@ -187,7 +266,7 @@ class RTCFireSession {
   /**
    * Handles a participant being removed
    */
-  onRemoveParticipant(pid) {
+  private onRemoveParticipant(pid) {
     if (!(pid in this.participantInfo)) {
       return;
     }
@@ -205,7 +284,7 @@ class RTCFireSession {
    * Creates a new RTC connection for the participant,
    * tearing down the existing one if it exists
    */
-  initConnectionForParticipant(pid) {
+  private initConnectionForParticipant(pid) {
     this.teardownConnectionForParticipant(pid);
 
     let info = this.participantInfo[pid];
@@ -264,7 +343,7 @@ class RTCFireSession {
   /**
    * Tears down the RTC connection for a participant
    */
-  teardownConnectionForParticipant(pid) {
+  private teardownConnectionForParticipant(pid) {
     let info = this.participantInfo[pid];
     if (!info.conn) {
       return;
@@ -278,10 +357,10 @@ class RTCFireSession {
     info.conn = null;
   }
 
-  processNewIceCandidates(pid) {
+  private processNewIceCandidates(pid) {
     let info = this.participantInfo[pid];
     let { conn, readVal, processedIceCandidates } = info;
-    let { iceCandidates } = readVal;
+    let { iceCandidates }: { iceCandidates: { [key: string]: RTCIceCandidateInit } } = readVal;
     if (!conn?.remoteDescription?.type || !iceCandidates) {
       return;
     }
@@ -300,7 +379,7 @@ class RTCFireSession {
   /**
    * Begins WebRTC negotiation. Should only be done if we're the offerer.
    */
-  async beginNegotiation(pid) {
+  private async beginNegotiation(pid) {
     let info = this.participantInfo[pid];
     if (!info) {
       return;
@@ -321,7 +400,7 @@ class RTCFireSession {
    * Makes progress on negotiating the RTC connection
    * if the state requires it
    */
-  async maybeContinueNegotiation(pid) {
+  private async maybeContinueNegotiation(pid) {
     let info = this.participantInfo[pid];
     let { conn, negotiationState, writeRef, readVal } = info;
 
@@ -390,7 +469,7 @@ class RTCFireSession {
    * Attaches the local media stream to a given RTCPeerConnection,
    * if the stream exists already.
    */
-  addLocalStreamToConnection(conn) {
+  private addLocalStreamToConnection(conn) {
     if (!this.localStream) {
       return;
     }
@@ -421,8 +500,8 @@ function hashString(s) {
 }
 
 /**
- * Creates a new RTCFireSession with the given options
+ * Creates a new RTCFireSession with the given options.
  */
-export function rtcFireSession(options) {
+export function rtcFireSession(options: RTCFireSessionOptions) {
   return new RTCFireSession(options);
 }

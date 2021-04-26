@@ -2,11 +2,12 @@
   "name": "rtcfire",
   "version": "0.0.3",
   "description": "A simple WebRTC + Firebase Realtime Database library for multi-user video chat",
-  "source": "src/index.js",
+  "source": "src/index.ts",
   "main": "dist/index.js",
   "exports": "./dist/index.modern.js",
   "module": "dist/index.module.js",
   "unpkg": "dist/index.umd.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "microbundle",
