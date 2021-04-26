@@ -1,6 +1,6 @@
 {
   "name": "rtcfire",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A simple WebRTC + Firebase Realtime Database library for multi-user video chat",
   "source": "src/index.ts",
   "main": "dist/index.js",
