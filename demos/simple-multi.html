@@ -50,7 +50,7 @@
   <h1><a href="https://github.com/romannurik/rtcfire">rtcfire</a> Simple Multi-Peer Demo</h1>
   <p id="topic-header"></p>
   <h3>Your local video stream</h3>
-  <video id="my-video" muted autoplay></video>
+  <video id="my-video" muted autoplay playsinline></video>
 
   <h3 id="peers-header">Other participants</h3>
   <ul id="peers"></ul>
@@ -153,7 +153,7 @@
           if (!node) {
             node = document.createElement('li');
             node.setAttribute('data-pid', pid);
-            node.innerHTML = '<video autoplay>';
+            node.innerHTML = '<video autoplay playsinline>';
             parent.appendChild(node);
           }
 
